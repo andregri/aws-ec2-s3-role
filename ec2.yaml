@@ -1,0 +1,76 @@
+Parameters:
+  EC2KeyParameter:
+    Type: String
+    Description: Enter key name in eu-west-1 region to ssh into ec2 instance
+  OwnerParameter:
+    Type: String
+    Default: "Andrea Training Roles"
+    Description: Enter owner name of the cloudformation stack
+  BucketNameParameter:
+    Type: String
+    Description: Enter bucket name which can be listed by the ec2 instance
+
+Resources:
+  S3ReadOnlyRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: S3ReadOnly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 's3:ListBucket'
+                Resource: !Join [ "", [ "arn:aws:s3:::", !Ref BucketNameParameter ] ]
+      Tags:
+        - Key: "Owner"
+          Value:
+            Ref: OwnerParameter
+
+  S3ReadOnlyInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref S3ReadOnlyRole
+
+  WebappSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow ssh into the instance
+      GroupName: webapp-sg
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 22
+          ToPort: 22
+          IpProtocol: tcp
+      Tags:
+        - Key: "Owner"
+          Value:
+            Ref: OwnerParameter
+
+  WebappEC2:
+    Type: AWS::EC2::Instance
+    DependsOn: WebappSecurityGroup
+    Properties:
+      ImageId: "ami-0e8cb4bdc5bb2e6c0" # eu-west-1
+      InstanceType: "t2.micro"
+      KeyName:
+        Ref: EC2KeyParameter
+      SecurityGroups:
+        - Ref: WebappSecurityGroup
+      IamInstanceProfile:
+        Ref: S3ReadOnlyInstanceProfile
+      Tags:
+        - Key: "Owner"
+          Value:
+            Ref: OwnerParameter
